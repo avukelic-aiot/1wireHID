@@ -16,9 +16,8 @@ Thumbs.db
 packages/
 *.nupkg
 
-# JetBrains Rider
-.idea/
-*.sln.iml
+# Sensitive configuration (contains secrets)
+PRIVATE.md
 
 # Temporary files
 *.tmp

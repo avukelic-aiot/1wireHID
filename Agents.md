@@ -1,5 +1,26 @@
 # Agents.md - 1wireHID Development Notes
 
+## Secrets Configuration
+
+All secrets (GitHub tokens, API keys, etc.) are stored in `PRIVATE.md` - this file is NOT committed to git.
+
+**GitHub Account: avukelic-aiot**
+
+Always verify the correct account is active before pushing:
+```batch
+gh auth status
+```
+
+If a different account is active, switch to avukelic-aiot:
+```batch
+gh auth switch -h github.com -u avukelic-aiot
+```
+
+To update GitHub credentials:
+1. Edit `PRIVATE.md` with your GitHub token
+2. Verify account is active: `gh auth status`
+3. Use `github.com` authentication when pushing
+
 ## Project Overview
 
 1wireHID is a .NET 8 application that reads iButton/1-Wire devices and emits their ROM as keyboard input (human-readable hex string followed by Enter).
