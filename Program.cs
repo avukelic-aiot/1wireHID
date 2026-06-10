@@ -5,13 +5,14 @@ namespace OneWireHID;
 
 internal class Program
 {
+    private const string VERSION = "0.1.0";
     private static bool _running = true;
     private static bool _verbose = false;
     private static bool _serviceMode = false;
 
     static void Main(string[] args)
     {
-        Console.WriteLine("1wireHID v1.0 - iButton Keyboard Emulator");
+        Console.WriteLine($"1wireHID v{VERSION} - iButton Keyboard Emulator");
         Console.WriteLine("==========================================");
         Console.WriteLine();
 
