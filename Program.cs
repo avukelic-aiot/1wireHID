@@ -5,7 +5,7 @@ namespace OneWireHID;
 
 internal class Program
 {
-    private const string VERSION = "0.1.0";
+    private const string VERSION = "0.1.1";
     private static bool _running = true;
     private static bool _verbose = false;
     private static bool _serviceMode = false;

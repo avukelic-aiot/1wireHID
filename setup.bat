@@ -5,7 +5,7 @@ REM ============================================================
 REM 1wireHID Setup Script v0.1.0
 REM ============================================================
 
-set "SCRIPT_VERSION=0.1.0"
+set "SCRIPT_VERSION=0.1.1"
 set "REPO_URL=https://github.com/avukelic-aiot/1wireHID"
 set "GITHUB_API=https://api.github.com/repos/avukelic-aiot/1wireHID/releases/latest"
 

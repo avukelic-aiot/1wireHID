@@ -14,17 +14,26 @@
 
 ## Instalacija
 
-### Opcija 1: Preuzmi gotovi release (preporučeno)
+### Opcija 1: Preuzmi i pokreni setup.bat (preporučeno)
 
 ```batch
-# Preuzmi i pokreni setup (jedna naredba)
-powershell -Command "Invoke-WebRequest -Uri 'https://github.com/avukelic-aiot/1wireHID/releases/latest/download/1wireHID-Setup.exe' -OutFile '%TEMP%\1wireHID-Setup.exe'; Start-Process '%TEMP%\1wireHID-Setup.exe'"
+# Preuzmi setup.bat i pokreni ga
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.bat' -OutFile '%USERPROFILE%\Desktop\setup.bat'; Start-Process '%USERPROFILE%\Desktop\setup.bat'"
 ```
 
 Ili ručno:
-1. Idi na https://github.com/avukelic-aiot/1wireHID/releases
-2. Preuzmi najnoviji `1wireHID-Setup.exe`
-3. Pokreni installer
+1. Preuzmi `setup.bat` iz repozitorija
+2. Pokreni ga (desni klik → Run as administrator)
+
+Setup će automatski:
+- Provjeriti .NET 8 SDK i instalirati ga ako nedostaje
+- Buildati aplikaciju
+- Kopirati datoteke u `C:\Program Files\1wireHID\`
+
+### Opcija 2: Preuzmi gotovi release
+
+Preuzmi najnoviji release s GitHub stranice:
+https://github.com/avukelic-aiot/1wireHID/releases/latest
 
 ### Opcija 2: Build iz source koda
 
@@ -232,4 +241,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.1.0 - Initial release
+v0.1.1 - Fix: Corrected installation URL in README
