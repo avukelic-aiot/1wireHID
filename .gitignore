@@ -1,0 +1,28 @@
+# Build outputs
+bin/
+obj/
+publish/
+
+# Visual Studio
+*.user
+*.suo
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# NuGet
+packages/
+*.nupkg
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Temporary files
+*.tmp
+*.bak
+
+# 1-Wire SDK (large, external dependency)
+.1Wire/
