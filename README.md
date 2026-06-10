@@ -16,14 +16,13 @@
 
 ### Opcija 1: Preuzmi i pokreni setup.bat (preporučeno)
 
-```batch
-# Preuzmi setup.bat i pokreni ga
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.bat' -OutFile '%USERPROFILE%\Desktop\setup.bat'; Start-Process '%USERPROFILE%\Desktop\setup.bat'"
+Preuzmi `setup.bat` na Desktop i pokreni kao administrator:
+
+```powershell
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.bat' -OutFile 'C:\Users\avukelic\Desktop\setup.bat'"
 ```
 
-Ili ručno:
-1. Preuzmi `setup.bat` iz repozitorija
-2. Pokreni ga (desni klik → Run as administrator)
+ zatim pokreni `C:\Users\avukelic\Desktop\setup.bat` (desni klik → Run as administrator)
 
 Setup će automatski:
 - Provjeriti .NET 8 SDK i instalirati ga ako nedostaje
@@ -241,4 +240,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.1.1 - Fix: Corrected installation URL in README
+v0.1.2 - Fix: Simplified installation PowerShell command
