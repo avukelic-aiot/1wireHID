@@ -109,6 +109,7 @@ Bootstrapper responsibilities:
 - download the latest compiled release
 - create startup shortcut
 - launch tray app
+- write per-run logs under `%TEMP%\1wireHID-setup`
 
 ## SDK Reference
 

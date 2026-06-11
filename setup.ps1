@@ -8,8 +8,9 @@ $ReleaseApiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/lat
 $UserAgent = '1wireHID-Setup'
 $DefaultInstallPath = 'C:\Program Files\1wireHID'
 $TempRoot = Join-Path $env:TEMP '1wireHID-setup'
-$LogFile = Join-Path $TempRoot 'setup.log'
-$TranscriptFile = Join-Path $TempRoot 'setup.transcript.txt'
+$RunId = "$(Get-Date -Format 'yyyyMMdd-HHmmss-fff')-$PID"
+$LogFile = Join-Path $TempRoot "setup-$RunId.log"
+$TranscriptFile = Join-Path $TempRoot "setup-$RunId.transcript.txt"
 $DriverAssetName = 'OneWireDrivers_x64.msi'
 $AppAssetName = '1wireHID-win-x64.zip'
 

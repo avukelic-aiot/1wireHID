@@ -35,7 +35,7 @@ Bootstrapper će:
 - skinuti najnoviji compiled release asset
 - instalirati aplikaciju u `C:\Program Files\1wireHID`
 - stvoriti startup shortcut i pokrenuti tray app
-- zapisati log u `%TEMP%\1wireHID-setup\setup.log`
+- zapisati log u `%TEMP%\1wireHID-setup\setup-<run>.log`
 
 ### Build iz source koda
 
