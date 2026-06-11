@@ -25,3 +25,7 @@ PRIVATE.md
 
 # 1-Wire SDK (large, external dependency)
 .1Wire/
+
+# Local docs and old installer script
+.doc/
+Install-1wireHID.ps1

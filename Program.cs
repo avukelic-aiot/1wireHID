@@ -1,11 +1,20 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using System.Text;
+using System.Windows.Forms;
 
 namespace OneWireHID;
 
 internal class Program
 {
-    private const string VERSION = "0.1.3";
+    private const string VERSION = "0.2.0";
+    private const int SW_HIDE = 0;
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetConsoleWindow();
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    private const string EVENT_LOG_SOURCE = "OneWireHID";
     private static bool _running = true;
     private static bool _verbose = false;
     private static bool _serviceMode = false;
@@ -40,6 +49,12 @@ internal class Program
                 case "-svc":
                     _serviceMode = true;
                     break;
+                case "-tray":
+                    _serviceMode = false;
+                    break;
+                case "-console":
+                    _serviceMode = false;
+                    break;
                 case "-rom":
                     if (i + 1 < args.Length) { manualRom = args[i + 1]; i++; }
                     break;
@@ -58,9 +73,18 @@ internal class Program
             return;
         }
 
+        bool trayMode = args.Length == 0 || args.Any(a => a.Equals("-tray", StringComparison.OrdinalIgnoreCase));
+        bool consoleMode = args.Any(a => a.Equals("-console", StringComparison.OrdinalIgnoreCase));
+
         if (_serviceMode)
         {
             RunAsService(portType, portNum);
+        }
+        else if (trayMode && !consoleMode)
+        {
+            HideConsoleWindow();
+            ApplicationConfiguration.Initialize();
+            Application.Run(new TrayAppContext(portType, portNum));
         }
         else
         {
@@ -68,85 +92,27 @@ internal class Program
         }
     }
 
+    private static void HideConsoleWindow()
+    {
+        var handle = GetConsoleWindow();
+        if (handle != IntPtr.Zero)
+            ShowWindow(handle, SW_HIDE);
+    }
+
     static void RunTerminal(int portType, int portNum)
     {
         Console.CancelKeyPress += (s, e) => { e.Cancel = true; _running = false; };
 
-        using var adapter = new TMEXAdapter(portType, portNum);
-
-        if (!adapter.Open())
-        {
-            Console.WriteLine("ERROR: Could not open 1-Wire adapter.");
-            Console.WriteLine("Make sure the 1-Wire drivers (IBFS64.dll) are installed and");
-            Console.WriteLine("the DS9490R/DS9097U adapter is connected.");
-            return;
-        }
-
-        Console.WriteLine($"[OK] Adapter opened: {adapter.AdapterDescription}");
-        Console.WriteLine($"[OK] Port type: {portType}, Port num: {portNum}");
-        Console.WriteLine();
         Console.WriteLine("=== Terminal Mode - Press Ctrl+C to exit ===");
         Console.WriteLine();
 
-        byte[] lastRom = new byte[8];
-        Array.Fill(lastRom, (byte)0);
-        bool lastWasPresent = false;
-        int pollCount = 0;
-
-        while (_running)
-        {
-            try
-            {
-                pollCount++;
-                var result = adapter.Reset();
-                bool presentNow = result == TMEXResetResult.Presence || result == TMEXResetResult.Alarm;
-
-                if (_verbose)
-                {
-                    string resetStr = result switch
-                    {
-                        TMEXResetResult.NoPresence => "NO PRESENCE",
-                        TMEXResetResult.Presence => "PRESENCE",
-                        TMEXResetResult.Alarm => "ALARM",
-                        TMEXResetResult.Short => "SHORT",
-                        _ => $"UNKNOWN({(int)result})"
-                    };
-                    Console.WriteLine($"[Poll #{pollCount}] Reset: {resetStr}");
-                }
-
-                if (presentNow && !lastWasPresent)
-                {
-                    Console.WriteLine();
-                    Console.WriteLine(">>> iButton DETECTED <<<");
-
-                    byte[] rom = new byte[8];
-                    if (adapter.SearchNext(rom, 0, false))
-                    {
-                        string romHex = FormatROM(rom);
-                        string familyCode = $"0x{rom[0]:X2}";
-
-                        Console.WriteLine($"  Family Code : {familyCode}");
-                        Console.WriteLine($"  Serial No   : {romHex.Substring(2)}");
-                        Console.WriteLine($"  Full ROM    : {romHex}");
-                        Console.WriteLine($"  CRC         : 0x{rom[7]:X2} (valid: {CheckCRC8(rom)})");
-                        Console.WriteLine();
-
-                        Console.Write("  Sending as keyboard input... ");
-                        KeyboardSimulator.SendROM(romHex);
-                        Console.WriteLine("DONE");
-                    }
-                }
-
-                lastWasPresent = presentNow;
-
-                Thread.Sleep(100);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ERROR] {ex.Message}");
-                Thread.Sleep(500);
-            }
-        }
+        RunPollingLoop(
+            portType,
+            portNum,
+            _verbose,
+            () => _running,
+            message => Console.WriteLine(message),
+            message => Console.Error.WriteLine(message));
 
         Console.WriteLine();
         Console.WriteLine("Exiting.");
@@ -161,7 +127,128 @@ internal class Program
         ServiceBase.Run(servicesToRun);
     }
 
-    static string FormatROM(byte[] rom)
+    internal static void RunPollingLoop(
+        int portType,
+        int portNum,
+        bool verbose,
+        Func<bool> shouldStop,
+        Action<string> output,
+        Action<string> error)
+    {
+        while (!shouldStop())
+        {
+            using var adapter = new TMEXAdapter(portType, portNum);
+
+            if (!adapter.Open())
+            {
+                if (verbose)
+                    output("[INFO] Waiting for 1-Wire adapter...");
+
+                SleepInterruptibly(1500, shouldStop);
+                continue;
+            }
+
+            if (verbose)
+            {
+                output($"[OK] Adapter opened: {adapter.AdapterDescription}");
+                output($"[OK] Port type: {portType}, Port num: {adapter.PortNum}");
+                output(string.Empty);
+            }
+
+            bool baselineEstablished = false;
+            bool lastWasPresent = false;
+            int pollCount = 0;
+
+            while (!shouldStop())
+            {
+                try
+                {
+                    pollCount++;
+                    var result = adapter.Reset();
+                    bool presentNow = result == TMEXResetResult.Presence || result == TMEXResetResult.Alarm;
+
+                    if (!baselineEstablished)
+                    {
+                        lastWasPresent = presentNow;
+                        baselineEstablished = true;
+                    }
+
+                    if (verbose)
+                    {
+                        string resetStr = result switch
+                        {
+                            TMEXResetResult.NoPresence => "NO PRESENCE",
+                            TMEXResetResult.Presence => "PRESENCE",
+                            TMEXResetResult.Alarm => "ALARM",
+                            TMEXResetResult.Short => "SHORT",
+                            _ => $"UNKNOWN({(int)result})"
+                        };
+                        output($"[Poll #{pollCount}] Reset: {resetStr}");
+                    }
+
+                    if (presentNow && !lastWasPresent)
+                    {
+                        byte[] rom = new byte[8];
+                        if (adapter.SearchNext(rom, 0, false))
+                        {
+                            string romHex = FormatROM(rom);
+
+                            output(">>> iButton DETECTED <<<");
+
+                            if (verbose)
+                            {
+                                string familyCode = $"0x{rom[0]:X2}";
+                                output($"  Family Code : {familyCode}");
+                                output($"  Serial No   : {romHex.Substring(2)}");
+                                output($"  Full ROM    : {romHex}");
+                                output($"  CRC         : 0x{rom[7]:X2} (valid: {CheckCRC8(rom)})");
+                            }
+
+                            output("  Sending as keyboard input...");
+                            KeyboardSimulator.SendROM(romHex);
+                            output("  DONE");
+                        }
+                    }
+
+                    lastWasPresent = presentNow;
+                    SleepInterruptibly(100, shouldStop);
+                }
+                catch (Exception ex)
+                {
+                    error($"[ERROR] Adapter error: {ex.Message}");
+                    break;
+                }
+            }
+        }
+    }
+
+    internal static void WriteEventLog(string message, EventLogEntryType entryType)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        try
+        {
+            EventLog.WriteEntry(EVENT_LOG_SOURCE, message, entryType);
+        }
+        catch
+        {
+            // Swallow event log errors so service mode stays quiet.
+        }
+    }
+
+    private static void SleepInterruptibly(int milliseconds, Func<bool> shouldStop)
+    {
+        int elapsed = 0;
+        while (elapsed < milliseconds && !shouldStop())
+        {
+            int slice = Math.Min(100, milliseconds - elapsed);
+            Thread.Sleep(slice);
+            elapsed += slice;
+        }
+    }
+
+    internal static string FormatROM(byte[] rom)
     {
         var sb = new StringBuilder(16);
         for (int i = 7; i >= 0; i--)
@@ -169,7 +256,7 @@ internal class Program
         return sb.ToString();
     }
 
-    static bool CheckCRC8(byte[] rom)
+    internal static bool CheckCRC8(byte[] rom)
     {
         byte crc = 0;
         for (int i = 0; i < 7; i++)
@@ -223,7 +310,8 @@ internal class Program
         Console.WriteLine("  -usb [n]     Use USB adapter (DS9490R), port number n (default: 0)");
         Console.WriteLine("  -com n       Use COM port adapter (DS9097U), port number n");
         Console.WriteLine("  -v, -verbose Verbose output showing raw driver data");
-        Console.WriteLine("  -service     Run as Windows service");
+        Console.WriteLine("  -tray        Run tray mode (default)");
+        Console.WriteLine("  -console     Run console diagnostic mode");
         Console.WriteLine("  -rom <hex>   Send a specific ROM and exit (for testing)");
         Console.WriteLine("  -h, -help    Show this help");
         Console.WriteLine();
@@ -232,7 +320,7 @@ internal class Program
     }
 }
 
-public class OneWireHIDService : ServiceBase
+    public class OneWireHIDService : ServiceBase
 {
     private readonly int _portType;
     private readonly int _portNum;
@@ -265,56 +353,13 @@ public class OneWireHIDService : ServiceBase
 
     void ServiceWorker()
     {
-        Array.Fill(_lastRom, (byte)0);
-        Array.Fill(_currentRom, (byte)0);
-
-        using var adapter = new TMEXAdapter(_portType, _portNum);
-
-        if (!adapter.Open())
-        {
-            EventLog.WriteEntry("OneWireHID", "Could not open 1-Wire adapter.", EventLogEntryType.Error);
-            return;
-        }
-
-        while (!_stopping)
-        {
-            try
-            {
-                var result = adapter.Reset();
-                bool presentNow = result == TMEXResetResult.Presence || result == TMEXResetResult.Alarm;
-
-                if (presentNow)
-                {
-                    if (adapter.SearchNext(_currentRom, 0, false))
-                    {
-                        bool isDifferent = false;
-                        for (int i = 0; i < 8; i++)
-                        {
-                            if (_currentRom[i] != _lastRom[i])
-                            {
-                                isDifferent = true;
-                                break;
-                            }
-                        }
-
-                        if (isDifferent)
-                        {
-                            Array.Copy(_currentRom, _lastRom, 8);
-                            string romHex = FormatROM(_currentRom);
-                            KeyboardSimulator.SendROM(romHex);
-                        }
-                    }
-                }
-
-                Thread.Sleep(100);
-            }
-            catch
-            {
-                Thread.Sleep(500);
-            }
-        }
-
-        adapter.Close();
+        Program.RunPollingLoop(
+            _portType,
+            _portNum,
+            verbose: false,
+            shouldStop: () => _stopping,
+            output: message => Program.WriteEventLog(message, EventLogEntryType.Information),
+            error: message => Program.WriteEventLog(message, EventLogEntryType.Error));
     }
 
     static string FormatROM(byte[] rom)

@@ -14,38 +14,29 @@
 
 ## Instalacija
 
-### Opcija 1: Preuzmi i pokreni setup.bat (preporučeno)
+### Preporučeno: bootstrapper iz linka
 
-Jedna naredba koja preuzme i pokrene setup:
+Pokreni iz PowerShella:
 
 ```powershell
-powershell -Command "Invoke-WebRequest 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.bat' -OutFile \"$env:TEMP\setup.bat\"; Start-Process -Wait \"$env:TEMP\setup.bat\""
+powershell -Command "iwr 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.ps1' | iex"
 ```
 
- Ili ručno:
-1. Preuzmi `setup.bat` s https://github.com/avukelic-aiot/1wireHID/raw/main/setup.bat
-2. Pokreni kao administrator
+Bootstrapper će:
+- tražiti admin privilegije ako nisu već aktivne
+- instalirati 1-Wire driver MSI ako nije prisutan
+- instalirati samo .NET 8 runtime ako nije prisutan
+- skinuti najnoviji compiled release asset
+- instalirati aplikaciju u `C:\Program Files\1wireHID`
+- stvoriti startup shortcut i pokrenuti tray app
 
-Setup će automatski:
-- Provjeriti .NET 8 SDK i instalirati ga ako nedostaje
-- Zatražiti administratorske privilegije
-- Pitati za putanju instalacije (default: `C:\Program Files\1wireHID`)
-- Buildati aplikaciju
-- Kopirati datoteke u odabranu putanju
-- Ostati otvoren dok ne pritisneš tipku (vidljiv rezultat)
-
-### Opcija 2: Preuzmi gotovi release
-
-Preuzmi najnoviji release s GitHub stranice:
-https://github.com/avukelic-aiot/1wireHID/releases/latest
-
-### Opcija 2: Build iz source koda
+### Build iz source koda
 
 #### Preduvjeti
 
 - Windows 10/11 x64
 - [Git](https://git-scm.com/download/win)
-- .NET 8 SDK (setup.bat će ga automatski instalirati ako nedostaje)
+- .NET 8 SDK (samo za build iz sourcea)
 
 #### Koraci
 
@@ -54,27 +45,21 @@ https://github.com/avukelic-aiot/1wireHID/releases/latest
 git clone https://github.com/avukelic-aiot/1wireHID.git
 cd 1wireHID
 
-# Pokreni setup (automatski builda i instalira)
-setup.bat
+# Pokreni setup (lokalni source flow)
+setup.ps1
 ```
 
-Setup skripta će:
-1. Zatražiti administratorske privilegije (ako nije pokrenut kao admin)
-2. Provjeriti ima li .NET 8 SDK, i ako nema - automatski ga instalirati
-3. Provjeriti ima li novije verzije na GitHubu
-4. Pitati za putanju instalacije (default: `C:\Program Files\1wireHID`)
-5. Buildati aplikaciju
-6. Kopirati datoteke u odabranu putanju
-7. Stvoriti `version.ini` file s informacijama o verziji
+Local setup služi samo za development. Remote bootstrapper (`setup.ps1`) koristi compiled release.
 
 ---
 
 ### 1-Wire Driveri (obavezno)
 
-Driver DLL (`IBFS64.dll`) je potreban za rad. Kopirajte ga u instalacijski folder:
+Bootstrapper instalira driver MSI ako ga ne nađe.
 
-1. Ekstrahirajte iz `.1Wire/install_1_wire_drivers_x64_v405.zip`
-2. Kopirajte `IBFS64.dll` u `C:\Program Files\1wireHID\`
+Izvor drivera:
+
+`.1Wire/OneWireDrivers_x64.msi`
 
 ---
 
@@ -93,18 +78,12 @@ Driver DLL (`IBFS64.dll`) je potreban za rad. Kopirajte ga u instalacijski folde
 1wireHID.exe -com 1
 ```
 
-### Windows Service
+### Tray app
 
 ```batch
-# Instalacija servisa (kao administrator)
-sc create OneWireHID binPath= "C:\Program Files\1wireHID\1wireHID.exe -service"
-sc start OneWireHID
-
-# Zaustavljanje
-sc stop OneWireHID
-
-# Brisanje servisa
-sc delete OneWireHID
+# Tray app će se pokrenuti automatski nakon instalacije
+# Ručno pokretanje:
+"C:\Program Files\1wireHID\1wireHID.exe" -tray
 ```
 
 ### Testiranje bez hardware-a
@@ -123,7 +102,8 @@ sc delete OneWireHID
 | `-usb [n]` | USB adapter (DS9490R), port broj n (default: 0) |
 | `-com n` | COM port adapter (DS9097U), port broj n |
 | `-v, -verbose` | Verbose output - prikazuje raw podatke od drivera |
-| `-service, -svc` | Pokreni kao Windows Service |
+| `-tray` | Pokreni tray način rada |
+| `-console` | Pokreni console debug način |
 | `-rom <hex>` | Pošalji specificiran ROM i izađi (za testiranje) |
 | `-h, -help` | Prikaži pomoć |
 
@@ -175,7 +155,7 @@ Prikaz:     EFCDAB8967452301
 
 ### Provjera verzija
 
-Setup skripta automatski provjerava ima li novije verzije na GitHubu prije buildanja.
+Bootstrapper automatski uzima latest release.
 
 Za ručnu provjeru:
 ```batch
@@ -193,10 +173,11 @@ git tag -l "v*"
 ```
 1wireHID/
 ├── 1wireHID.csproj      # .NET 8 projekt
-├── Program.cs            # Glavni program + Windows Service
+├── Program.cs            # Glavni program + tray/console host
 ├── TMEX64.cs             # P/Invoke wrapper za IBFS64.dll
 ├── KeyboardSimulator.cs  # SendInput keyboard emulation
-├── setup.bat             # Setup/instalacijska skripta
+├── setup.ps1             # Remote bootstrapper
+├── setup.bat             # Lokalni wrapper
 ├── README.md             # Ova datoteka
 ├── Agents.md             # Development notes
 └── .gitignore            # Git ignore pravila
@@ -209,7 +190,7 @@ git tag -l "v*"
 ### Build locally
 
 ```batch
-dotnet build 1wireHID.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./publish
+dotnet build 1wireHID.csproj -c Release -r win-x64
 ```
 
 ### Kreiraj novi release
@@ -245,4 +226,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.1.3 - Fix: Setup script waits for keypress before closing, Start-Process -Wait in README
+v0.2.0 - Feature: Tray app bootstrapper, runtime-only install, release asset flow

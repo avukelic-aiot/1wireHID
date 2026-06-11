@@ -91,33 +91,50 @@ public class TMEXAdapter : IDisposable
 
     public bool Open()
     {
-        int sessionOptions = TMEXConstants.SESSION_INFINITE;
-        _sessionHandle = TMEX64.TMExtendedStartSession((short)_portNum, (short)_portType, ref sessionOptions);
-
-        if (_sessionHandle <= 0)
-            return false;
-
-        if (TMEX64.TMSetup(_sessionHandle) != 1)
+        foreach (int candidatePort in EnumerateCandidatePorts())
         {
-            TMEX64.TMEndSession(_sessionHandle);
-            _sessionHandle = -1;
-            return false;
+            int sessionOptions = TMEXConstants.SESSION_INFINITE;
+            int sessionHandle = TMEX64.TMExtendedStartSession((short)candidatePort, (short)_portType, ref sessionOptions);
+
+            if (sessionHandle <= 0)
+                continue;
+
+            if (TMEX64.TMSetup(sessionHandle) != 1)
+            {
+                TMEX64.TMEndSession(sessionHandle);
+                continue;
+            }
+
+            var versionBuffer = new System.Text.StringBuilder(256);
+            TMEX64.TMGetTypeVersion(_portType, versionBuffer);
+
+            byte[] specBuffer = new byte[319];
+            if (TMEX64.TMGetAdapterSpec(sessionHandle, specBuffer) > 0)
+            {
+                int i;
+                for (i = 64; i < 319; i++)
+                    if (specBuffer[i] == 0) break;
+                AdapterDescription = System.Text.UTF8Encoding.UTF8.GetString(specBuffer, 64, i - 64);
+            }
+
+            TMEX64.TMFirst(sessionHandle, _stateBuffer);
+            _sessionHandle = sessionHandle;
+            _portNum = candidatePort;
+            return true;
         }
 
-        var versionBuffer = new System.Text.StringBuilder(256);
-        TMEX64.TMGetTypeVersion(_portType, versionBuffer);
+        return false;
+    }
 
-        byte[] specBuffer = new byte[319];
-        if (TMEX64.TMGetAdapterSpec(_sessionHandle, specBuffer) > 0)
+    private IEnumerable<int> EnumerateCandidatePorts()
+    {
+        yield return _portNum;
+
+        for (int i = 0; i < 16; i++)
         {
-            int i;
-            for (i = 64; i < 319; i++)
-                if (specBuffer[i] == 0) break;
-            AdapterDescription = System.Text.UTF8Encoding.UTF8.GetString(specBuffer, 64, i - 64);
+            if (i != _portNum)
+                yield return i;
         }
-
-        TMEX64.TMFirst(_sessionHandle, _stateBuffer);
-        return true;
     }
 
     public void Close()
