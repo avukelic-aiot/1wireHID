@@ -6,13 +6,8 @@
     <Nullable>enable</Nullable>
     <AssemblyName>1wireHID</AssemblyName>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="System.Diagnostics.EventLog" Version="8.0.0" />
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
-  </ItemGroup>
 </Project>

@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.ServiceProcess;
 using System.Text;
 using System.Windows.Forms;
 
@@ -8,16 +6,14 @@ namespace OneWireHID;
 
 internal class Program
 {
-    private const string VERSION = "0.2.0";
+    private const string VERSION = "0.2.1";
     private const int SW_HIDE = 0;
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetConsoleWindow();
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    private const string EVENT_LOG_SOURCE = "OneWireHID";
     private static bool _running = true;
     private static bool _verbose = false;
-    private static bool _serviceMode = false;
 
     static void Main(string[] args)
     {
@@ -45,15 +41,9 @@ internal class Program
                 case "-verbose":
                     _verbose = true;
                     break;
-                case "-service":
-                case "-svc":
-                    _serviceMode = true;
-                    break;
                 case "-tray":
-                    _serviceMode = false;
                     break;
                 case "-console":
-                    _serviceMode = false;
                     break;
                 case "-rom":
                     if (i + 1 < args.Length) { manualRom = args[i + 1]; i++; }
@@ -73,14 +63,10 @@ internal class Program
             return;
         }
 
-        bool trayMode = args.Length == 0 || args.Any(a => a.Equals("-tray", StringComparison.OrdinalIgnoreCase));
         bool consoleMode = args.Any(a => a.Equals("-console", StringComparison.OrdinalIgnoreCase));
+        bool trayMode = args.Length == 0 || args.Any(a => a.Equals("-tray", StringComparison.OrdinalIgnoreCase));
 
-        if (_serviceMode)
-        {
-            RunAsService(portType, portNum);
-        }
-        else if (trayMode && !consoleMode)
+        if (trayMode && !consoleMode)
         {
             HideConsoleWindow();
             ApplicationConfiguration.Initialize();
@@ -116,15 +102,6 @@ internal class Program
 
         Console.WriteLine();
         Console.WriteLine("Exiting.");
-    }
-
-    static void RunAsService(int portType, int portNum)
-    {
-        var servicesToRun = new ServiceBase[]
-        {
-            new OneWireHIDService(portType, portNum)
-        };
-        ServiceBase.Run(servicesToRun);
     }
 
     internal static void RunPollingLoop(
@@ -222,21 +199,6 @@ internal class Program
         }
     }
 
-    internal static void WriteEventLog(string message, EventLogEntryType entryType)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-            return;
-
-        try
-        {
-            EventLog.WriteEntry(EVENT_LOG_SOURCE, message, entryType);
-        }
-        catch
-        {
-            // Swallow event log errors so service mode stays quiet.
-        }
-    }
-
     private static void SleepInterruptibly(int milliseconds, Func<bool> shouldStop)
     {
         int elapsed = 0;
@@ -317,56 +279,5 @@ internal class Program
         Console.WriteLine();
         Console.WriteLine("When running in terminal mode, touch an iButton to the reader and its ID will be");
         Console.WriteLine("typed as keyboard input followed by Enter.");
-    }
-}
-
-    public class OneWireHIDService : ServiceBase
-{
-    private readonly int _portType;
-    private readonly int _portNum;
-    private Thread? _workerThread;
-    private bool _stopping = false;
-    private byte[] _lastRom = new byte[8];
-    private byte[] _currentRom = new byte[8];
-
-    public OneWireHIDService(int portType, int portNum)
-    {
-        _portType = portType;
-        _portNum = portNum;
-        ServiceName = "OneWireHID";
-        CanStop = true;
-        CanShutdown = true;
-    }
-
-    protected override void OnStart(string[] args)
-    {
-        _workerThread = new Thread(ServiceWorker);
-        _workerThread.IsBackground = true;
-        _workerThread.Start();
-    }
-
-    protected override void OnStop()
-    {
-        _stopping = true;
-        _workerThread?.Join(5000);
-    }
-
-    void ServiceWorker()
-    {
-        Program.RunPollingLoop(
-            _portType,
-            _portNum,
-            verbose: false,
-            shouldStop: () => _stopping,
-            output: message => Program.WriteEventLog(message, EventLogEntryType.Information),
-            error: message => Program.WriteEventLog(message, EventLogEntryType.Error));
-    }
-
-    static string FormatROM(byte[] rom)
-    {
-        var sb = new StringBuilder(16);
-        for (int i = 7; i >= 0; i--)
-            sb.Append(rom[i].ToString("X2"));
-        return sb.ToString();
     }
 }

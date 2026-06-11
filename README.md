@@ -7,7 +7,7 @@
 - Čita iButton uređaje preko TMEX API-ja (IBFS64.dll)
 - Šalje ROM kao keyboard input - 16 hex znakova bez separatora
 - Dodaje Enter na kraju svakog unosa
-- Radi kao terminal aplikacija ili Windows Service
+- Radi kao tray aplikacija ili terminal za testiranje
 - Podržava USB (DS9490R) i Serijski (DS9097U) adapter
 
 ---
@@ -148,7 +148,7 @@ Prikaz:     EFCDAB8967452301
 2. Commit s promjenama se radi normalno
 3. Kada je spremno za release:
    ```batch
-   git tag -a v0.2.0 -m "Release version 0.2.0 - [opis promjena]"
+   git tag -a v0.2.1 -m "Release version 0.2.1 - [opis promjena]"
    git push origin main --tags
    ```
 4. Na GitHubu kreiraj Release iz taga
@@ -198,10 +198,10 @@ dotnet build 1wireHID.csproj -c Release -r win-x64
 ```batch
 # Ažuriraj verziju u Program.cs (VERSION konstanta)
 # Commitaj promjene
-git add . && git commit -m "Update version to 0.2.0"
+git add . && git commit -m "Update version to 0.2.1"
 
 # Tagiraj
-git tag -a v0.2.0 -m "Release version 0.2.0"
+git tag -a v0.2.1 -m "Release version 0.2.1"
 
 # Push
 git push origin main --tags
@@ -210,7 +210,7 @@ git push origin main --tags
 Na GitHubu:
 1. Idi na Releases page
 2. Klikni "Draft a new release"
-3. Odaberi tag `v0.2.0`
+3. Odaberi tag `v0.2.1`
 4. Unesi release notes
 5. Klikni "Publish release"
 
@@ -226,4 +226,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.2.0 - Feature: Tray app bootstrapper, runtime-only install, release asset flow
+v0.2.1 - Bugfix: remove legacy service flow, tray-only install

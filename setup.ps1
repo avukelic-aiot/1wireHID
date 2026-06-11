@@ -6,7 +6,6 @@ $RepoName = '1wireHID'
 $RawSetupUrl = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/main/setup.ps1"
 $ReleaseApiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
 $UserAgent = '1wireHID-Setup'
-$EventSource = 'OneWireHID'
 $DefaultInstallPath = 'C:\Program Files\1wireHID'
 $TempRoot = Join-Path $env:TEMP '1wireHID-setup'
 $DriverAssetName = 'OneWireDrivers_x64.msi'
@@ -159,17 +158,6 @@ function Ensure-DotNetRuntime {
     Write-Info '.NET 8 runtime installed successfully.'
 }
 
-function Ensure-EventSource {
-    try {
-        if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
-            New-EventLog -LogName Application -Source $EventSource
-        }
-    }
-    catch {
-        Write-Warn "Could not register Event Log source: $($_.Exception.Message)"
-    }
-}
-
 function Install-App([string]$InstallPath, $Release) {
     Ensure-Directory $InstallPath
 
@@ -239,7 +227,6 @@ function Main {
 
     Ensure-DotNetRuntime
 
-    Ensure-EventSource
     Install-App -InstallPath $installPath -Release $release
     $shortcut = Install-StartupShortcut -InstallPath $installPath
 
