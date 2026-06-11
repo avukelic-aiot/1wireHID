@@ -73,13 +73,14 @@ function Download-File([string]$Uri, [string]$Destination) {
 
 function Get-LocalDriverMsi {
     if ($PSScriptRoot) {
-        $candidate = Join-Path $PSScriptRoot '.1Wire\OneWireDrivers_x64.msi'
+        $candidate = Join-Path -Path ([string]$PSScriptRoot) -ChildPath '.1Wire\OneWireDrivers_x64.msi'
         if (Test-Path -LiteralPath $candidate) {
             return $candidate
         }
     }
 
-    $candidate = Join-Path (Get-Location) '.1Wire\OneWireDrivers_x64.msi'
+    $currentPath = (Get-Location).Path
+    $candidate = Join-Path -Path $currentPath -ChildPath '.1Wire\OneWireDrivers_x64.msi'
     if (Test-Path -LiteralPath $candidate) {
         return $candidate
     }
