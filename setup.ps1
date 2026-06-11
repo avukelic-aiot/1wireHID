@@ -90,8 +90,8 @@ function Get-LocalDriverMsi {
 
 function Test-DriverInstalled {
     $paths = @(
-        Join-Path $env:WINDIR 'System32\IBFS64.dll',
-        Join-Path $env:WINDIR 'SysWOW64\IBFS64.dll'
+        (Join-Path -Path $env:WINDIR -ChildPath 'System32\IBFS64.dll'),
+        (Join-Path -Path $env:WINDIR -ChildPath 'SysWOW64\IBFS64.dll')
     )
     foreach ($p in $paths) {
         if (Test-Path -LiteralPath $p) { return $true }

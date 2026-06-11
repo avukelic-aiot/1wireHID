@@ -161,7 +161,7 @@ Prikaz:     EFCDAB8967452301
 2. Commit s promjenama se radi normalno
 3. Kada je spremno za release:
    ```batch
-   git tag -a v0.2.3 -m "Release version 0.2.3 - [opis promjena]"
+   git tag -a v0.2.4 -m "Release version 0.2.4 - [opis promjena]"
    git push origin main --tags
    ```
 4. Na GitHubu kreiraj Release iz taga
@@ -212,10 +212,10 @@ dotnet publish 1wireHID.csproj -c Release -r win-x64
 ```batch
 # Ažuriraj verziju u Program.cs (VERSION konstanta)
 # Commitaj promjene
-git add . && git commit -m "Update version to 0.2.3"
+git add . && git commit -m "Update version to 0.2.4"
 
 # Tagiraj
-git tag -a v0.2.3 -m "Release version 0.2.3"
+git tag -a v0.2.4 -m "Release version 0.2.4"
 
 # Push
 git push origin main --tags
@@ -224,7 +224,7 @@ git push origin main --tags
 Na GitHubu:
 1. Idi na Releases page
 2. Klikni "Draft a new release"
-3. Odaberi tag `v0.2.3`
+3. Odaberi tag `v0.2.4`
 4. Unesi release notes
 5. Klikni "Publish release"
 
@@ -240,4 +240,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.2.3 - Bugfix: local MSI copy to build output and cmd bootstrap flow
+v0.2.4 - Bugfix: bootstrapper path resolution and log handling

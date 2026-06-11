@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>1wireHID</AssemblyName>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Version>0.2.3</Version>
+    <Version>0.2.4</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
