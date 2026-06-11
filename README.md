@@ -148,7 +148,7 @@ Prikaz:     EFCDAB8967452301
 2. Commit s promjenama se radi normalno
 3. Kada je spremno za release:
    ```batch
-   git tag -a v0.2.1 -m "Release version 0.2.1 - [opis promjena]"
+   git tag -a v0.2.2 -m "Release version 0.2.2 - [opis promjena]"
    git push origin main --tags
    ```
 4. Na GitHubu kreiraj Release iz taga
@@ -177,7 +177,6 @@ git tag -l "v*"
 ├── TMEX64.cs             # P/Invoke wrapper za IBFS64.dll
 ├── KeyboardSimulator.cs  # SendInput keyboard emulation
 ├── setup.ps1             # Remote bootstrapper
-├── setup.bat             # Lokalni wrapper
 ├── README.md             # Ova datoteka
 ├── Agents.md             # Development notes
 └── .gitignore            # Git ignore pravila
@@ -198,10 +197,10 @@ dotnet build 1wireHID.csproj -c Release -r win-x64
 ```batch
 # Ažuriraj verziju u Program.cs (VERSION konstanta)
 # Commitaj promjene
-git add . && git commit -m "Update version to 0.2.1"
+git add . && git commit -m "Update version to 0.2.2"
 
 # Tagiraj
-git tag -a v0.2.1 -m "Release version 0.2.1"
+git tag -a v0.2.2 -m "Release version 0.2.2"
 
 # Push
 git push origin main --tags
@@ -210,7 +209,7 @@ git push origin main --tags
 Na GitHubu:
 1. Idi na Releases page
 2. Klikni "Draft a new release"
-3. Odaberi tag `v0.2.1`
+3. Odaberi tag `v0.2.2`
 4. Unesi release notes
 5. Klikni "Publish release"
 
@@ -226,4 +225,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.2.1 - Bugfix: remove legacy service flow, tray-only install
+v0.2.2 - Bugfix: tray-only status cleanup, remove setup.bat

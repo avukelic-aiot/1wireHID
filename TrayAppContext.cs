@@ -10,13 +10,13 @@ internal sealed class TrayAppContext : ApplicationContext
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly ToolStripMenuItem _readerStatusItem;
-    private readonly ToolStripMenuItem _deviceStatusItem;
-    private readonly ToolStripMenuItem _activityStatusItem;
-    private readonly ToolStripMenuItem _reconnectItem;
     private TMEXAdapter? _adapter;
     private string? _ignoredRom;
     private string? _lastSentRom;
     private bool _learnedReaderRom;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
 
     public TrayAppContext(int portType, int portNum)
     {
@@ -24,19 +24,12 @@ internal sealed class TrayAppContext : ApplicationContext
         _portNum = portNum;
 
         var menu = new ContextMenuStrip();
-        _readerStatusItem = new ToolStripMenuItem("Reader: searching...") { Enabled = false };
-        _deviceStatusItem = new ToolStripMenuItem("iButton: waiting...") { Enabled = false };
-        _activityStatusItem = new ToolStripMenuItem("Activity: idle") { Enabled = false };
-        _reconnectItem = new ToolStripMenuItem("Reconnect now", null, (_, _) => ForceReconnect());
+        _readerStatusItem = new ToolStripMenuItem("Reader not found") { Enabled = false };
         var exitItem = new ToolStripMenuItem("Exit", null, (_, _) => ExitThreadCore());
 
         menu.Items.AddRange(new ToolStripItem[]
         {
             _readerStatusItem,
-            _deviceStatusItem,
-            _activityStatusItem,
-            new ToolStripSeparator(),
-            _reconnectItem,
             new ToolStripSeparator(),
             exitItem
         });
@@ -44,7 +37,7 @@ internal sealed class TrayAppContext : ApplicationContext
         _notifyIcon = new NotifyIcon
         {
             Visible = true,
-            Icon = SystemIcons.Application,
+            Icon = CreateStatusIcon(false),
             Text = "1wireHID",
             ContextMenuStrip = menu,
             BalloonTipIcon = ToolTipIcon.Info,
@@ -55,7 +48,7 @@ internal sealed class TrayAppContext : ApplicationContext
         _timer.Tick += (_, _) => PollOnce();
         _timer.Start();
 
-        UpdateUi("Reader: starting...", "iButton: waiting...", "Activity: idle", SystemIcons.Information, false);
+        UpdateUi(false);
     }
 
     protected override void ExitThreadCore()
@@ -67,16 +60,6 @@ internal sealed class TrayAppContext : ApplicationContext
         base.ExitThreadCore();
     }
 
-    private void ForceReconnect()
-    {
-        _adapter?.Dispose();
-        _adapter = null;
-        _ignoredRom = null;
-        _lastSentRom = null;
-        _learnedReaderRom = false;
-        UpdateUi("Reader: reconnecting...", "iButton: waiting...", "Activity: reconnect", SystemIcons.Warning, true);
-    }
-
     private void PollOnce()
     {
         try
@@ -86,14 +69,14 @@ internal sealed class TrayAppContext : ApplicationContext
                 _adapter = new TMEXAdapter(_portType, _portNum);
                 if (!_adapter.Open())
                 {
-                    UpdateUi("Reader: not connected", "iButton: waiting...", "Activity: searching", SystemIcons.Warning, false);
+                    UpdateUi(false);
                     return;
                 }
 
                 _ignoredRom = null;
                 _lastSentRom = null;
                 _learnedReaderRom = false;
-                UpdateUi($"Reader: connected (USB #{_adapter.PortNum})", "iButton: waiting...", "Activity: connected", SystemIcons.Information, true);
+                UpdateUi(true);
             }
 
             var result = _adapter.Reset();
@@ -101,21 +84,18 @@ internal sealed class TrayAppContext : ApplicationContext
 
             if (!presentNow)
             {
-                UpdateUi($"Reader: connected (USB #{_adapter.PortNum})", "iButton: none", "Activity: idle", SystemIcons.Information, false);
                 return;
             }
 
             byte[] rom = new byte[8];
             if (!_adapter.SearchNext(rom, 0, false))
             {
-                UpdateUi($"Reader: connected (USB #{_adapter.PortNum})", "iButton: reading...", "Activity: search failed", SystemIcons.Warning, false);
                 return;
             }
 
             string romHex = Program.FormatROM(rom);
             if (!Program.CheckCRC8(rom))
             {
-                UpdateUi($"Reader: connected (USB #{_adapter.PortNum})", "iButton: invalid CRC", "Activity: ignored", SystemIcons.Warning, false);
                 return;
             }
 
@@ -123,13 +103,11 @@ internal sealed class TrayAppContext : ApplicationContext
             {
                 _ignoredRom = romHex;
                 _learnedReaderRom = true;
-                UpdateUi($"Reader: connected (USB #{_adapter.PortNum})", "iButton: reader ignored", "Activity: ready", SystemIcons.Information, false);
                 return;
             }
 
             if (romHex == _ignoredRom)
             {
-                UpdateUi($"Reader: connected (USB #{_adapter.PortNum})", "iButton: reader ignored", "Activity: waiting", SystemIcons.Information, false);
                 return;
             }
 
@@ -137,27 +115,39 @@ internal sealed class TrayAppContext : ApplicationContext
             {
                 KeyboardSimulator.SendROM(romHex);
                 _lastSentRom = romHex;
-                UpdateUi($"Reader: connected (USB #{_adapter.PortNum})", $"iButton: {romHex}", "Activity: sent", SystemIcons.Information, true);
-                _notifyIcon.ShowBalloonTip(1000, "1wireHID", $"iButton sent: {romHex}", ToolTipIcon.Info);
             }
         }
         catch
         {
             _adapter?.Dispose();
             _adapter = null;
-            UpdateUi("Reader: not connected", "iButton: waiting...", "Activity: reconnect", SystemIcons.Warning, false);
+            UpdateUi(false);
         }
     }
 
-    private void UpdateUi(string reader, string device, string activity, Icon icon, bool reconnectEnabled)
+    private void UpdateUi(bool connected)
     {
-        _readerStatusItem.Text = reader;
-        _deviceStatusItem.Text = device;
-        _activityStatusItem.Text = activity;
-        _reconnectItem.Enabled = reconnectEnabled;
-        _notifyIcon.Icon = icon;
-        _notifyIcon.Text = TrimTooltip($"1wireHID | {reader} | {device}");
+        _readerStatusItem.Text = connected ? "Reader connected" : "Reader not found";
+        _notifyIcon.Icon = CreateStatusIcon(connected);
+        _notifyIcon.Text = connected ? "1wireHID | Reader connected" : "1wireHID | Reader not found";
     }
 
-    private static string TrimTooltip(string text) => text.Length <= 63 ? text : text[..63];
+    private static Icon CreateStatusIcon(bool connected)
+    {
+        var bmp = new Bitmap(16, 16);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            g.Clear(Color.Transparent);
+            using var brush = new SolidBrush(connected ? Color.LimeGreen : Color.IndianRed);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.FillEllipse(brush, 1, 1, 14, 14);
+            g.DrawEllipse(Pens.Black, 1, 1, 14, 14);
+        }
+
+        var hIcon = bmp.GetHicon();
+        var icon = Icon.FromHandle(hIcon);
+        var clone = (Icon)icon.Clone();
+        DestroyIcon(hIcon);
+        return clone;
+    }
 }
