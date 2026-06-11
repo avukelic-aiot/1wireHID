@@ -9,6 +9,7 @@ $UserAgent = '1wireHID-Setup'
 $DefaultInstallPath = 'C:\Program Files\1wireHID'
 $TempRoot = Join-Path $env:TEMP '1wireHID-setup'
 $LogFile = Join-Path $TempRoot 'setup.log'
+$TranscriptFile = Join-Path $TempRoot 'setup.transcript.txt'
 $DriverAssetName = 'OneWireDrivers_x64.msi'
 $AppAssetName = '1wireHID-win-x64.zip'
 
@@ -258,7 +259,7 @@ function Main {
 
 try {
     Ensure-Directory $TempRoot
-    Start-Transcript -LiteralPath $LogFile -Append | Out-Null
+    Start-Transcript -LiteralPath $TranscriptFile -Append | Out-Null
     Write-Log 'Installer started.'
     Main
 }
