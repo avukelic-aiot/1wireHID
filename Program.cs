@@ -6,7 +6,7 @@ namespace OneWireHID;
 
 internal class Program
 {
-    private const string VERSION = "0.2.2";
+    private const string VERSION = "0.2.3";
     private const int SW_HIDE = 0;
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetConsoleWindow();

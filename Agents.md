@@ -23,7 +23,7 @@ To update GitHub credentials:
 
 ## Project Overview
 
-1wireHID is a .NET 8 application that reads iButton/1-Wire devices and emits their ROM as keyboard input (human-readable hex string followed by Enter).
+1wireHID is a .NET 8 tray application that reads iButton/1-Wire devices and emits their ROM as keyboard input (human-readable hex string followed by Enter).
 
 ## Key Technical Decisions
 
@@ -34,7 +34,7 @@ The SDK provides two APIs:
 2. **Compact.NET API** - Higher-level managed wrapper (OneWireLinkLayer.dll)
 
 For Windows x64 deployment, TMEX API was chosen because:
-- Self-contained deployment without JRE dependency
+- Runtime-only deployment with a small compiled release
 - Direct P/Invoke to IBFS64.dll provides full control
 - Compact.NET is deprecated (Microsoft discontinued .NET CF support)
 
@@ -53,7 +53,7 @@ Used USB (type 6) as default for DS9490R adapter.
 
 - `TMEX64.cs` - All P/Invoke declarations for IBFS64.dll
 - `KeyboardSimulator.cs` - SendInput wrapper for keyboard emulation
-- `Program.cs` - Main logic + Windows Service implementation
+- `Program.cs` - Main logic + tray host and console debug mode
 
 ### IBFS64.dll Location
 
@@ -61,7 +61,9 @@ The driver DLL must be accessible:
 - Same folder as executable
 - Or in Windows\System32
 
-The 1-Wire drivers come as an MSI/EXE installer but can be extracted from `install_1_wire_drivers_x64_v405.zip`.
+The 1-Wire drivers come as an MSI installer stored at `.1Wire/OneWireDrivers_x64.msi`.
+
+Local builds copy the MSI into `bin/Release/net8.0-windows/win-x64/` and `publish/` so manual installers can pick it up.
 
 ### Keyboard Input Implementation
 
@@ -81,22 +83,27 @@ Example: Bytes `01 23 45 67 89 AB CD EF` displays as `EFCDAB8967452301`
 ## Build Instructions
 
 ```powershell
-dotnet build 1wireHID.csproj -c Release -r win-x64 --self-contained
+dotnet build 1wireHID.csproj -c Release -r win-x64
 ```
 
-Or publish single file:
+Publish output:
 ```powershell
-dotnet publish 1wireHID.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./publish
+dotnet publish 1wireHID.csproj -c Release -r win-x64
 ```
 
-## Windows Service Setup
+## Installation Flow
 
-```batch
-sc create OneWireHID binPath= "C:\path\to\1wireHID.exe -service"
-sc start OneWireHID
+Default install entrypoint is the PowerShell bootstrapper:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.ps1' | iex"
 ```
 
-Service writes errors to Windows Event Log.
+Bootstrapper responsibilities:
+- install 1-Wire driver MSI if missing
+- install .NET 8 runtime only if missing
+- download the latest compiled release
+- create startup shortcut
+- launch tray app
 
 ## SDK Reference
 
@@ -121,6 +128,8 @@ For testing without hardware:
 ```batch
 1wireHID.exe -rom 1800000012345678
 ```
+
+Tray mode is the default runtime mode. `-console` is only for diagnostics.
 
 ## ROM Detection Logic
 

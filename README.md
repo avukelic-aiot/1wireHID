@@ -16,10 +16,10 @@
 
 ### Preporučeno: bootstrapper iz linka
 
-Pokreni iz PowerShella:
+Copy-paste u CMD ili PowerShell:
 
 ```powershell
-powershell -Command "iwr 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.ps1' | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.ps1' | iex"
 ```
 
 Bootstrapper će:
@@ -45,11 +45,11 @@ Bootstrapper će:
 git clone https://github.com/avukelic-aiot/1wireHID.git
 cd 1wireHID
 
-# Pokreni setup (lokalni source flow)
-setup.ps1
+# Pokreni lokalni source setup
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-Local setup služi samo za development. Remote bootstrapper (`setup.ps1`) koristi compiled release.
+Local build služi za development. Remote bootstrapper (`setup.ps1`) koristi compiled release.
 
 ---
 
@@ -60,6 +60,12 @@ Bootstrapper instalira driver MSI ako ga ne nađe.
 Izvor drivera:
 
 `.1Wire/OneWireDrivers_x64.msi`
+
+Kod lokalnog builda MSI se kopira u `bin\Release\net8.0-windows\win-x64\` i `publish\` output.
+
+Ako trebaš .NET 8 runtime ručno, koristi:
+
+https://dotnet.microsoft.com/download/dotnet/8.0/runtime
 
 ---
 
@@ -148,7 +154,7 @@ Prikaz:     EFCDAB8967452301
 2. Commit s promjenama se radi normalno
 3. Kada je spremno za release:
    ```batch
-   git tag -a v0.2.2 -m "Release version 0.2.2 - [opis promjena]"
+   git tag -a v0.2.3 -m "Release version 0.2.3 - [opis promjena]"
    git push origin main --tags
    ```
 4. Na GitHubu kreiraj Release iz taga
@@ -190,6 +196,8 @@ git tag -l "v*"
 
 ```batch
 dotnet build 1wireHID.csproj -c Release -r win-x64
+
+dotnet publish 1wireHID.csproj -c Release -r win-x64
 ```
 
 ### Kreiraj novi release
@@ -197,10 +205,10 @@ dotnet build 1wireHID.csproj -c Release -r win-x64
 ```batch
 # Ažuriraj verziju u Program.cs (VERSION konstanta)
 # Commitaj promjene
-git add . && git commit -m "Update version to 0.2.2"
+git add . && git commit -m "Update version to 0.2.3"
 
 # Tagiraj
-git tag -a v0.2.2 -m "Release version 0.2.2"
+git tag -a v0.2.3 -m "Release version 0.2.3"
 
 # Push
 git push origin main --tags
@@ -209,7 +217,7 @@ git push origin main --tags
 Na GitHubu:
 1. Idi na Releases page
 2. Klikni "Draft a new release"
-3. Odaberi tag `v0.2.2`
+3. Odaberi tag `v0.2.3`
 4. Unesi release notes
 5. Klikni "Publish release"
 
@@ -225,4 +233,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.2.2 - Bugfix: tray-only status cleanup, remove setup.bat
+v0.2.3 - Bugfix: local MSI copy to build output and cmd bootstrap flow
