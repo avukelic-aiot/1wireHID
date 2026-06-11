@@ -5,7 +5,7 @@ REM ============================================================
 REM 1wireHID Setup Script v0.1.0
 REM ============================================================
 
-set "SCRIPT_VERSION=0.1.2"
+set "SCRIPT_VERSION=0.1.3"
 set "REPO_URL=https://github.com/avukelic-aiot/1wireHID"
 set "GITHUB_API=https://api.github.com/repos/avukelic-aiot/1wireHID/releases/latest"
 
@@ -56,7 +56,9 @@ if %errorLevel% neq 0 (
         if errorlevel 1 (
             echo [ERROR] .NET installation failed. Please install manually from:
             echo        https://dotnet.microsoft.com/download/dotnet/8.0
-            pause
+            echo.
+            echo Press any key to close...
+            pause >nul
             exit /b 1
         )
     )
@@ -66,7 +68,9 @@ REM Check dotnet is now available
 dotnet --version >nul 2>&1
 if %errorLevel% neq 0 (
     echo [ERROR] .NET 8 SDK is not available. Cannot proceed with build.
-    pause
+    echo.
+    echo Press any key to close...
+    pause >nul
     exit /b 1
 )
 
@@ -142,7 +146,9 @@ if not exist "!INSTALL_PATH!" (
     if errorlevel 1 (
         echo [ERROR] Failed to create directory: !INSTALL_PATH!
         echo [INFO] Please check permissions and try again.
-        pause
+        echo.
+        echo Press any key to close...
+        pause >nul
         exit /b 1
     )
 )
@@ -159,7 +165,9 @@ dotnet build 1wireHID.csproj -c Release -r win-x64 --self-contained -p:PublishSi
 if errorlevel 1 (
     echo.
     echo [ERROR] Build failed!
-    pause
+    echo.
+    echo Press any key to close...
+    pause >nul
     exit /b 1
 )
 
@@ -214,6 +222,9 @@ echo.
 echo NOTE: You may need to copy IBFS64.dll to the installation folder
 echo       if it's not already there. Get it from the 1-Wire drivers package.
 echo.
-pause
+echo ============================================================
+echo Press any key to close this window...
+echo ============================================================
+pause >nul
 endlocal
-exit /b 0
+exit

@@ -16,18 +16,23 @@
 
 ### Opcija 1: Preuzmi i pokreni setup.bat (preporučeno)
 
-Preuzmi `setup.bat` na Desktop i pokreni kao administrator:
+Jedna naredba koja preuzme i pokrene setup:
 
 ```powershell
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.bat' -OutFile 'C:\Users\avukelic\Desktop\setup.bat'"
+powershell -Command "Invoke-WebRequest 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/main/setup.bat' -OutFile \"$env:TEMP\setup.bat\"; Start-Process -Wait \"$env:TEMP\setup.bat\""
 ```
 
- zatim pokreni `C:\Users\avukelic\Desktop\setup.bat` (desni klik → Run as administrator)
+ Ili ručno:
+1. Preuzmi `setup.bat` s https://github.com/avukelic-aiot/1wireHID/raw/main/setup.bat
+2. Pokreni kao administrator
 
 Setup će automatski:
 - Provjeriti .NET 8 SDK i instalirati ga ako nedostaje
+- Zatražiti administratorske privilegije
+- Pitati za putanju instalacije (default: `C:\Program Files\1wireHID`)
 - Buildati aplikaciju
-- Kopirati datoteke u `C:\Program Files\1wireHID\`
+- Kopirati datoteke u odabranu putanju
+- Ostati otvoren dok ne pritisneš tipku (vidljiv rezultat)
 
 ### Opcija 2: Preuzmi gotovi release
 
@@ -240,4 +245,4 @@ Na GitHubu:
 
 ## Verzija
 
-v0.1.2 - Fix: Simplified installation PowerShell command
+v0.1.3 - Fix: Setup script waits for keypress before closing, Start-Process -Wait in README
