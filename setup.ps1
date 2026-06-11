@@ -8,12 +8,22 @@ $ReleaseApiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/lat
 $UserAgent = '1wireHID-Setup'
 $DefaultInstallPath = 'C:\Program Files\1wireHID'
 $TempRoot = Join-Path $env:TEMP '1wireHID-setup'
+$LogFile = Join-Path $TempRoot 'setup.log'
 $DriverAssetName = 'OneWireDrivers_x64.msi'
 $AppAssetName = '1wireHID-win-x64.zip'
 
 function Write-Info([string]$Message) { Write-Host "[INFO] $Message" -ForegroundColor Cyan }
 function Write-Warn([string]$Message) { Write-Host "[WARN] $Message" -ForegroundColor Yellow }
 function Write-Err([string]$Message) { Write-Host "[ERROR] $Message" -ForegroundColor Red }
+
+function Write-Log([string]$Message) {
+    Add-Content -LiteralPath $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
+}
+
+function Write-Step([string]$Message) {
+    Write-Info $Message
+    Write-Log $Message
+}
 
 function Test-Admin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -24,10 +34,10 @@ function Test-Admin {
 function Ensure-Admin {
     if (Test-Admin) { return }
 
-    Write-Info 'Requesting administrator privileges...'
+    Write-Step 'Requesting administrator privileges...'
     $self = Join-Path $TempRoot 'setup.ps1'
     New-Item -ItemType Directory -Path $TempRoot -Force | Out-Null
-    Invoke-WebRequest -Uri $RawSetupUrl -OutFile $self -Headers @{ 'User-Agent' = $UserAgent }
+    Invoke-WebRequest -Uri $RawSetupUrl -OutFile $self -Headers @{ 'User-Agent' = $UserAgent } -UseBasicParsing
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList @(
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
@@ -55,8 +65,8 @@ function Get-AssetUrl($Release, [string]$AssetName) {
 }
 
 function Download-File([string]$Uri, [string]$Destination) {
-    Write-Info "Downloading $(Split-Path -Leaf $Destination)..."
-    Invoke-WebRequest -Uri $Uri -Headers @{ 'User-Agent' = $UserAgent } -OutFile $Destination
+    Write-Step "Downloading $(Split-Path -Leaf $Destination)..."
+    Invoke-WebRequest -Uri $Uri -Headers @{ 'User-Agent' = $UserAgent } -OutFile $Destination -UseBasicParsing
 }
 
 function Get-LocalDriverMsi {
@@ -87,7 +97,7 @@ function Test-DriverInstalled {
 }
 
 function Install-Driver([string]$MsiPath) {
-    Write-Info 'Installing 1-Wire driver package...'
+    Write-Step 'Installing 1-Wire driver package...'
     $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', $MsiPath, '/qn', '/norestart') -Wait -PassThru
     if ($proc.ExitCode -ne 0) {
         throw "1-Wire driver MSI installation failed with exit code $($proc.ExitCode)."
@@ -107,7 +117,7 @@ function Ensure-DriverInstalled($Release) {
     $msiPath = $null
 
     if ($localMsi) {
-        Write-Info "Using local driver MSI: $localMsi"
+        Write-Step "Using local driver MSI: $localMsi"
         $msiPath = $localMsi
     }
     else {
@@ -133,7 +143,7 @@ function Ensure-DotNetRuntime {
         return
     }
 
-    Write-Info '.NET 8 runtime not found, installing runtime only...'
+    Write-Step '.NET 8 runtime not found, installing runtime only...'
     Ensure-Directory $TempRoot
 
     $runtimeInstallDir = Join-Path $env:ProgramFiles 'dotnet'
@@ -155,7 +165,7 @@ function Ensure-DotNetRuntime {
         throw '.NET 8 runtime installation failed.'
     }
 
-    Write-Info '.NET 8 runtime installed successfully.'
+    Write-Step '.NET 8 runtime installed successfully.'
 }
 
 function Install-App([string]$InstallPath, $Release) {
@@ -217,20 +227,20 @@ function Main {
     Write-Host '============================================================'
 
     $installPath = Select-InstallPath
-    Write-Info "Install path: $installPath"
+    Write-Step "Install path: $installPath"
 
     $release = Invoke-GitHubJson $ReleaseApiUrl
-    Write-Info "Latest release on GitHub: $($release.tag_name)"
+    Write-Step "Latest release on GitHub: $($release.tag_name)"
 
     Ensure-DriverInstalled -Release $release
-    Write-Info '1-Wire driver ready.'
+    Write-Step '1-Wire driver ready.'
 
     Ensure-DotNetRuntime
 
     Install-App -InstallPath $installPath -Release $release
     $shortcut = Install-StartupShortcut -InstallPath $installPath
 
-    Write-Info 'Starting tray app now...'
+    Write-Step 'Starting tray app now...'
     Start-Process -FilePath (Join-Path $installPath '1wireHID.exe') -ArgumentList '-tray' -WorkingDirectory $installPath | Out-Null
 
     Write-Host ''
@@ -242,7 +252,23 @@ function Main {
     Write-Host "Version: $($release.tag_name)"
     Write-Host 'Tray app started.'
     Write-Host ''
+    Write-Log 'Installation complete.'
     Read-Host 'Press Enter to close installer'
 }
 
-Main
+try {
+    Ensure-Directory $TempRoot
+    Start-Transcript -LiteralPath $LogFile -Append | Out-Null
+    Write-Log 'Installer started.'
+    Main
+}
+catch {
+    Write-Err $_.Exception.Message
+    Write-Log "ERROR: $($_.Exception.ToString())"
+    Write-Host ''
+    Read-Host "Installer failed. Log saved to $LogFile. Press Enter to close"
+    exit 1
+}
+finally {
+    try { Stop-Transcript | Out-Null } catch { }
+}

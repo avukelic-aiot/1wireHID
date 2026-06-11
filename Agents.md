@@ -95,7 +95,12 @@ dotnet publish 1wireHID.csproj -c Release -r win-x64
 
 Default install entrypoint is the PowerShell bootstrapper:
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
+```
+
+Debug varijanta koja ostaje otvorena:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
 ```
 
 Bootstrapper responsibilities:

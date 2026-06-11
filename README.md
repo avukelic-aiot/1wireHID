@@ -19,7 +19,13 @@
 Copy-paste u CMD ili PowerShell:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
+```
+
+Za debug, da prozor ostane otvoren i vidiš sav izlaz:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
 ```
 
 Bootstrapper će:
@@ -29,6 +35,7 @@ Bootstrapper će:
 - skinuti najnoviji compiled release asset
 - instalirati aplikaciju u `C:\Program Files\1wireHID`
 - stvoriti startup shortcut i pokrenuti tray app
+- zapisati log u `%TEMP%\1wireHID-setup\setup.log`
 
 ### Build iz source koda
 
