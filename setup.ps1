@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoOwner = 'avukelic-aiot'
 $RepoName = '1wireHID'
-$RawSetupUrl = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/main/setup.ps1"
+$RawSetupUrl = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/master/setup.ps1"
 $ReleaseApiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
 $UserAgent = '1wireHID-Setup'
 $DefaultInstallPath = 'C:\Program Files\1wireHID'
