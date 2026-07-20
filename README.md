@@ -1,243 +1,144 @@
-# 1wireHID - iButton Keyboard Emulator
+﻿# 1wireHID
 
-.NET 8 aplikacija koja čita iButton/1-Wire uređaje i šalje njihov ROM kao keyboard input (simulira tipkovnicu).
+1wireHID je Windows tray aplikacija za iButton / 1-Wire citace. Aplikacija cita iButton ROM i upisuje ga u trenutno aktivno polje kao da je upisan tipkovnicom, zatim salje Enter.
 
-## Funkcionalnost
+## Najjednostavnija instalacija
 
-- Čita iButton uređaje preko TMEX API-ja (IBFS64.dll)
-- Šalje ROM kao keyboard input - 16 hex znakova bez separatora
-- Dodaje Enter na kraju svakog unosa
-- Radi kao tray aplikacija ili terminal za testiranje
-- Podržava USB (DS9490R) i Serijski (DS9097U) adapter
-
----
-
-## Instalacija
-
-### Preporučeno: bootstrapper iz linka
-
-Copy-paste u CMD ili PowerShell:
+Korisnik treba samo otvoriti PowerShell ili CMD i pokrenuti ovu naredbu:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
 ```
 
-Za debug, da prozor ostane otvoren i vidiš sav izlaz:
+Installer ce automatski:
+
+1. zatraziti administratorska prava ako su potrebna,
+2. instalirati 1-Wire drivere ako `IBFS64.dll` nije pronaden,
+3. instalirati .NET 8 runtime ako nije prisutan,
+4. skinuti zadnji GitHub release paket `1wireHID-win-x64.zip`,
+5. instalirati aplikaciju u `C:\Program Files\1wireHID`,
+6. dodati startup shortcut za automatsko pokretanje nakon prijave,
+7. odmah pokrenuti tray aplikaciju.
+
+Za debug instalacije, da prozor ostane otvoren:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm 'https://raw.githubusercontent.com/avukelic-aiot/1wireHID/master/setup.ps1' | iex"
 ```
 
-Bootstrapper će:
-- tražiti admin privilegije ako nisu već aktivne
-- instalirati 1-Wire driver MSI ako nije prisutan
-- instalirati samo .NET 8 runtime ako nije prisutan
-- skinuti najnoviji compiled release asset
-- instalirati aplikaciju u `C:\Program Files\1wireHID`
-- stvoriti startup shortcut i pokrenuti tray app
-- zapisati log u `%TEMP%\1wireHID-setup\setup-<run>.log`
-
-### Build iz source koda
-
-#### Preduvjeti
+## Preduvjeti
 
 - Windows 10/11 x64
-- [Git](https://git-scm.com/download/win)
-- .NET 8 SDK (samo za build iz sourcea)
+- DS9490R/B ili kompatibilan 1-Wire USB adapter
+- Internet pristup tijekom instalacije
+- Administrator prava za instalaciju drivera i pisanje u `Program Files`
 
-#### Koraci
+Korisnik ne treba rucno instalirati drivere ni .NET runtime. Installer to radi automatski.
 
-```batch
-# Kloniraj repozitorij
-git clone https://github.com/avukelic-aiot/1wireHID.git
-cd 1wireHID
+## Nakon instalacije
 
-# Pokreni lokalni source setup
-powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+Tray aplikacija se pokrece automatski. Kada je iButton prislonjen na citac, njegov ROM se upisuje u aktivnu aplikaciju kao tekst:
+
+```text
+3000001956DFE001
 ```
 
-Local build služi za development. Remote bootstrapper (`setup.ps1`) koristi compiled release.
+Nakon ROM-a se salje Enter.
 
----
+## Logovi
 
-### 1-Wire Driveri (obavezno)
+Aplikacija zapisuje dva dnevna loga u korisnikov Documents folder:
 
-Bootstrapper instalira driver MSI ako ga ne nađe.
+- `1wireHID-iButtons-YYYY-MM-DD.csv` - jednostavan CSV zapis svakog iButton dodira
+- `1wireHID-YYYY-MM-DD.log` - runtime dijagnosticki log
 
-Izvor drivera:
+CSV format:
 
-`.1Wire/OneWireDrivers_x64.msi`
-
-Kod lokalnog builda MSI se kopira u `bin\Release\net8.0-windows\win-x64\` i `publish\` output.
-
-Ako trebaš .NET 8 runtime ručno, koristi:
-
-https://dotnet.microsoft.com/download/dotnet/8.0/runtime
-
----
-
-## Korištenje
-
-### Terminal Mode (testiranje)
-
-```batch
-# USB adapter (DS9490R) - default
-1wireHID.exe
-
-# Verbose mod - prikazuje sve podatke od drivera
-1wireHID.exe -v
-
-# COM port adapter (DS9097U)
-1wireHID.exe -com 1
+```csv
+timestamp,rom,source,event,forwarded
+"2026-07-20 10:23:58.968","3000001956DFE001","tray","touch","true"
 ```
 
-### Tray app
+`forwarded=true` znaci da je Windows `SendInput` prihvatio slanje tipkovnice.
 
-```batch
-# Tray app će se pokrenuti automatski nakon instalacije
-# Ručno pokretanje:
-"C:\Program Files\1wireHID\1wireHID.exe" -tray
+## Rucno pokretanje
+
+```powershell
+"C:\Program Files\1wireHID\1wireHID.exe" -tray -usb 2
 ```
 
-### Testiranje bez hardware-a
+## Dijagnostika
 
-```batch
-# Pošalji testni ROM kao keyboard input
-1wireHID.exe -rom 1800000012345678
+Console mode s prikazom adaptera, ROM-ova i slanja:
+
+```powershell
+"C:\Program Files\1wireHID\1wireHID.exe" -console -v -usb 2
 ```
 
----
+Samo detekcija i logiranje, bez slanja tipkovnice:
 
-## Opcije naredbenog retka
+```powershell
+"C:\Program Files\1wireHID\1wireHID.exe" -console -v -nosend -usb 2
+```
+
+Test slanja bez hardwarea:
+
+```powershell
+"C:\Program Files\1wireHID\1wireHID.exe" -rom 3000001956DFE001
+```
+
+## Opcije
 
 | Opcija | Opis |
-|--------|------|
-| `-usb [n]` | USB adapter (DS9490R), port broj n (default: 0) |
-| `-com n` | COM port adapter (DS9097U), port broj n |
-| `-v, -verbose` | Verbose output - prikazuje raw podatke od drivera |
-| `-tray` | Pokreni tray način rada |
-| `-console` | Pokreni console debug način |
-| `-rom <hex>` | Pošalji specificiran ROM i izađi (za testiranje) |
-| `-h, -help` | Prikaži pomoć |
-
----
+| --- | --- |
+| `-tray` | Pokrece tray aplikaciju |
+| `-console` | Pokrece console dijagnostiku |
+| `-v`, `-verbose` | Ispisuje detaljan debug output |
+| `-usb [n]` | USB 1-Wire adapter port, default je `2` |
+| `-com n` | Serijski 1-Wire adapter port |
+| `-nosend`, `-detectonly` | Detektira i logira iButton, ali ne salje tipkovnicu |
+| `-rom <hex>` | Posalje zadani ROM kao tipkovnicu i izade |
 
 ## Kako radi
 
-1. Aplikacija otvara 1-Wire adapter preko IBFS64.dll (TMEX API)
-2. U petlji izvodi reset na 1-Wire mreži (svakih 100ms)
-3. Kad se detektira iButton (reset vraća Presence ili Alarm), čita ROM
-4. Šalje ROM kao keyboard input:
-   - 16 hex znakova (npr. `1800000012345678`)
-   - Zatim Enter (VK_RETURN)
+1. Aplikacija otvara TMEX session preko `IBFS64.dll`.
+2. Citac DS9490R/B ima vlastiti ROM; aplikacija ga prepoznaje i ignorira.
+3. Svakih 100 ms skenira 1-Wire mrezu.
+4. Kada vidi novi iButton ROM, zapisuje ga u CSV i runtime log.
+5. ROM salje u aktivni prozor preko Windows `SendInput` API-ja.
 
-### ROM Format
+## Build iz sourcea
 
-1-Wire ROM je 8 bajtova: `[Family Code][Serial Number x6][CRC]`
+Za development je potreban .NET SDK:
 
-Prikazan kao 16 hex znakova u little-endian formatu:
-
-```
-Bajtovi:     [01] [23] [45] [67] [89] [AB] [CD] [EF]
-Prikaz:     EFCDAB8967452301
-            └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘
-            CRC  S/N6  S/N5  S/N4  S/N3  S/N2  S/N1  Family
+```powershell
+dotnet build .\1wireHID.csproj -c Release -r win-x64
+dotnet publish .\1wireHID.csproj -c Release -r win-x64 --self-contained false
 ```
 
-### Detekcija iButton dodira
+Release asset koji installer ocekuje:
 
-- Reset vraća `Presence (1)` kad je iButton prislonjen
-- `NoPresence (0)` kad nema uređaja
-- Samo nova (drugačija) ROM adresa aktivira keyboard output
-- Ovo sprječava duplicirane slanje ako iButton ostane prislonjen
-
----
-
-## Verzioniranje i Release
-
-### Pravila verzioniranja
-
-1. Verzija je u formatu `vMAJOR.MINOR.PATCH` (npr. `v0.1.0`)
-2. Commit s promjenama se radi normalno
-3. Kada je spremno za release:
-   ```batch
-   git tag -a v0.2.4 -m "Release version 0.2.4 - [opis promjena]"
-   git push origin main --tags
-   ```
-4. Na GitHubu kreiraj Release iz taga
-
-### Provjera verzija
-
-Bootstrapper automatski uzima latest release.
-
-Za ručnu provjeru:
-```batch
-# Pogledaj zadnji tag
-git tag -l "v*" --sort=-version:refname | head -1
-
-# Pogledaj sve tagove
-git tag -l "v*"
+```text
+1wireHID-win-x64.zip
 ```
 
----
+Driver release asset koji installer ocekuje:
 
-## Struktura projekta
-
-```
-1wireHID/
-├── 1wireHID.csproj      # .NET 8 projekt
-├── Program.cs            # Glavni program + tray/console host
-├── TMEX64.cs             # P/Invoke wrapper za IBFS64.dll
-├── KeyboardSimulator.cs  # SendInput keyboard emulation
-├── setup.ps1             # Remote bootstrapper
-├── README.md             # Ova datoteka
-├── Agents.md             # Development notes
-└── .gitignore            # Git ignore pravila
+```text
+OneWireDrivers_x64.msi
 ```
 
----
+## Release
 
-## Razvoj
+Za verziju `1.0.0`:
 
-### Build locally
-
-```batch
-dotnet build 1wireHID.csproj -c Release -r win-x64
-
-dotnet publish 1wireHID.csproj -c Release -r win-x64
+```powershell
+git tag -a v1.0.0 -m "Release version 1.0.0"
+git push origin master --tags
 ```
 
-### Kreiraj novi release
-
-```batch
-# Ažuriraj verziju u Program.cs (VERSION konstanta)
-# Commitaj promjene
-git add . && git commit -m "Update version to 0.2.4"
-
-# Tagiraj
-git tag -a v0.2.4 -m "Release version 0.2.4"
-
-# Push
-git push origin main --tags
-```
-
-Na GitHubu:
-1. Idi na Releases page
-2. Klikni "Draft a new release"
-3. Odaberi tag `v0.2.4`
-4. Unesi release notes
-5. Klikni "Publish release"
-
----
-
-## Poznati problemi
-
-- `IBFS64.dll` mora biti u instalacijskom folderu ili u PATH
-- Na nekim USB adapterima može trebati par sekundi za inicijalizaciju
-- Za COM port adapter, koristi `-com n` where n je 0-15
-
----
+Na GitHub Releases treba objaviti zip asset `1wireHID-win-x64.zip` i driver asset `OneWireDrivers_x64.msi`, jer ih `setup.ps1` automatski preuzima.
 
 ## Verzija
 
-v0.2.4 - Bugfix: bootstrapper path resolution and log handling
+`v1.0.0`

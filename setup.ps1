@@ -207,7 +207,7 @@ function Install-StartupShortcut([string]$InstallPath) {
 
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $target
-    $shortcut.Arguments = '-tray'
+    $shortcut.Arguments = '-tray -usb 2'
     $shortcut.WorkingDirectory = $InstallPath
     $shortcut.Description = '1wireHID tray app'
     $shortcut.Save()
@@ -244,7 +244,7 @@ function Main {
     $shortcut = Install-StartupShortcut -InstallPath $installPath
 
     Write-Step 'Starting tray app now...'
-    Start-Process -FilePath (Join-Path $installPath '1wireHID.exe') -ArgumentList '-tray' -WorkingDirectory $installPath | Out-Null
+    Start-Process -FilePath (Join-Path $installPath '1wireHID.exe') -ArgumentList '-tray', '-usb', '2' -WorkingDirectory $installPath | Out-Null
 
     Write-Host ''
     Write-Host '============================================================'

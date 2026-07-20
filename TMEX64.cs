@@ -80,6 +80,7 @@ public class TMEXAdapter : IDisposable
     private bool _disposed;
 
     public string AdapterDescription { get; private set; } = "";
+    public string? AdapterRom { get; private set; }
     public int PortNum => _portNum;
 
     public TMEXAdapter(int portType = TMEXConstants.PORT_TYPE_USB, int portNum = 0)
@@ -116,6 +117,7 @@ public class TMEXAdapter : IDisposable
                     if (specBuffer[i] == 0) break;
                 AdapterDescription = System.Text.UTF8Encoding.UTF8.GetString(specBuffer, 64, i - 64);
             }
+            AdapterRom = ExtractAdapterRom(AdapterDescription);
 
             TMEX64.TMFirst(sessionHandle, _stateBuffer);
             _sessionHandle = sessionHandle;
@@ -124,6 +126,22 @@ public class TMEXAdapter : IDisposable
         }
 
         return false;
+    }
+
+    private static string? ExtractAdapterRom(string description)
+    {
+        const string marker = "ID:";
+        int start = description.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (start < 0)
+            return null;
+
+        start += marker.Length;
+        int end = start;
+        while (end < description.Length && Uri.IsHexDigit(description[end]))
+            end++;
+
+        string rom = description[start..end].Trim().ToUpperInvariant();
+        return rom.Length == 16 ? rom : null;
     }
 
     private IEnumerable<int> EnumerateCandidatePorts()
@@ -165,6 +183,36 @@ public class TMEXAdapter : IDisposable
         if (rt <= 0) return false;
 
         ROM[0] = 0;
+        if (TMEX64.TMRom(_sessionHandle, _stateBuffer, ROM) != 1) return false;
+
+        for (int i = 0; i < 8; i++)
+            romBuffer[i + offset] = (byte)ROM[i];
+
+        return true;
+    }
+
+    public List<byte[]> SearchAll()
+    {
+        if (_sessionHandle < 0) throw new InvalidOperationException("Session not open");
+
+        var devices = new List<byte[]>();
+        short result = TMEX64.TMFirst(_sessionHandle, _stateBuffer);
+
+        while (result == 1)
+        {
+            var rom = new byte[8];
+            if (ReadCurrentRom(rom, 0))
+                devices.Add(rom);
+
+            result = TMEX64.TMNext(_sessionHandle, _stateBuffer);
+        }
+
+        return devices;
+    }
+
+    private bool ReadCurrentRom(byte[] romBuffer, int offset)
+    {
+        short[] ROM = new short[8];
         if (TMEX64.TMRom(_sessionHandle, _stateBuffer, ROM) != 1) return false;
 
         for (int i = 0; i < 8; i++)

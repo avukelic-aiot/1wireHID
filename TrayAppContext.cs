@@ -11,9 +11,8 @@ internal sealed class TrayAppContext : ApplicationContext
     private readonly System.Windows.Forms.Timer _timer;
     private readonly ToolStripMenuItem _readerStatusItem;
     private TMEXAdapter? _adapter;
-    private string? _ignoredRom;
-    private string? _lastSentRom;
-    private bool _learnedReaderRom;
+    private readonly HashSet<string> _ignoredRoms = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _activeRoms = new(StringComparer.OrdinalIgnoreCase);
 
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
@@ -49,6 +48,7 @@ internal sealed class TrayAppContext : ApplicationContext
         _timer.Start();
 
         UpdateUi(false);
+        AppLogger.Info($"Tray app started. portType={_portType}, portNum={_portNum}");
     }
 
     protected override void ExitThreadCore()
@@ -73,10 +73,11 @@ internal sealed class TrayAppContext : ApplicationContext
                     return;
                 }
 
-                _ignoredRom = null;
-                _lastSentRom = null;
-                _learnedReaderRom = false;
+                _ignoredRoms.Clear();
+                _activeRoms.Clear();
+                LearnReaderDevice();
                 UpdateUi(true);
+                AppLogger.Info($"Adapter opened in tray. description='{_adapter.AdapterDescription}', portType={_portType}, portNum={_adapter.PortNum}, adapterRom={_adapter.AdapterRom ?? ""}");
             }
 
             var result = _adapter.Reset();
@@ -84,45 +85,59 @@ internal sealed class TrayAppContext : ApplicationContext
 
             if (!presentNow)
             {
+                LogRemovedDevices(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
                 return;
             }
 
-            byte[] rom = new byte[8];
-            if (!_adapter.SearchNext(rom, 0, false))
+            var currentRoms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rom in _adapter.SearchAll())
             {
-                return;
+                if (!Program.CheckCRC8(rom))
+                    continue;
+
+                string romHex = Program.FormatROM(rom);
+                if (!_ignoredRoms.Contains(romHex))
+                    currentRoms.Add(romHex);
             }
 
-            string romHex = Program.FormatROM(rom);
-            if (!Program.CheckCRC8(rom))
+            foreach (var romHex in currentRoms)
             {
-                return;
+                if (_activeRoms.Contains(romHex))
+                    continue;
+
+                bool forwarded = KeyboardSimulator.SendROM(romHex);
+                AppLogger.IButtonTouched(romHex, "tray", forwarded);
+                AppLogger.Info($"iButton touch detected. rom={romHex}, source=tray, forwarded={forwarded}");
             }
 
-            if (!_learnedReaderRom)
-            {
-                _ignoredRom = romHex;
-                _learnedReaderRom = true;
-                return;
-            }
-
-            if (romHex == _ignoredRom)
-            {
-                return;
-            }
-
-            if (!string.Equals(_lastSentRom, romHex, StringComparison.OrdinalIgnoreCase))
-            {
-                KeyboardSimulator.SendROM(romHex);
-                _lastSentRom = romHex;
-            }
+            LogRemovedDevices(currentRoms);
+            _activeRoms = currentRoms;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Error("Tray polling error", ex);
             _adapter?.Dispose();
             _adapter = null;
             UpdateUi(false);
         }
+    }
+
+    private void LearnReaderDevice()
+    {
+        if (_adapter == null || string.IsNullOrWhiteSpace(_adapter.AdapterRom))
+            return;
+
+        _ignoredRoms.Add(_adapter.AdapterRom);
+        AppLogger.Info($"Ignoring reader ROM {_adapter.AdapterRom}");
+    }
+
+    private void LogRemovedDevices(HashSet<string> currentRoms)
+    {
+        foreach (var romHex in _activeRoms)
+            if (!currentRoms.Contains(romHex))
+                AppLogger.Info($"iButton removed. rom={romHex}, source=tray");
+
+        _activeRoms = currentRoms;
     }
 
     private void UpdateUi(bool connected)

@@ -6,13 +6,14 @@
     <Nullable>enable</Nullable>
     <AssemblyName>1wireHID</AssemblyName>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Version>0.2.4</Version>
+    <Version>1.0.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include=".1Wire\OneWireDrivers_x64.msi"
+          Condition="Exists('.1Wire\OneWireDrivers_x64.msi')"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

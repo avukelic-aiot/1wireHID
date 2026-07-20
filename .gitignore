@@ -2,6 +2,8 @@
 bin/
 obj/
 publish/
+local-test-install/
+release-assets/
 
 # Visual Studio
 *.user

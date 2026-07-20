@@ -6,7 +6,7 @@ namespace OneWireHID;
 
 internal class Program
 {
-    private const string VERSION = "0.2.4";
+    private const string VERSION = "1.0.0";
     private const int SW_HIDE = 0;
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetConsoleWindow();
@@ -22,8 +22,9 @@ internal class Program
         Console.WriteLine();
 
         int portType = TMEXConstants.PORT_TYPE_USB;
-        int portNum = 0;
+        int portNum = 2;
         string? manualRom = null;
+        bool sendKeyboard = true;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -47,6 +48,10 @@ internal class Program
                     break;
                 case "-rom":
                     if (i + 1 < args.Length) { manualRom = args[i + 1]; i++; }
+                    break;
+                case "-nosend":
+                case "-detectonly":
+                    sendKeyboard = false;
                     break;
                 case "-h":
                 case "-help":
@@ -74,7 +79,7 @@ internal class Program
         }
         else
         {
-            RunTerminal(portType, portNum);
+            RunTerminal(portType, portNum, sendKeyboard);
         }
     }
 
@@ -85,7 +90,7 @@ internal class Program
             ShowWindow(handle, SW_HIDE);
     }
 
-    static void RunTerminal(int portType, int portNum)
+    static void RunTerminal(int portType, int portNum, bool sendKeyboard)
     {
         Console.CancelKeyPress += (s, e) => { e.Cancel = true; _running = false; };
 
@@ -96,6 +101,7 @@ internal class Program
             portType,
             portNum,
             _verbose,
+            sendKeyboard,
             () => _running,
             message => Console.WriteLine(message),
             message => Console.Error.WriteLine(message));
@@ -108,11 +114,14 @@ internal class Program
         int portType,
         int portNum,
         bool verbose,
-        Func<bool> shouldStop,
+        bool sendKeyboard,
+        Func<bool> shouldContinue,
         Action<string> output,
         Action<string> error)
     {
-        while (!shouldStop())
+        AppLogger.Info($"Console polling started. portType={portType}, portNum={portNum}, sendKeyboard={sendKeyboard}");
+
+        while (shouldContinue())
         {
             using var adapter = new TMEXAdapter(portType, portNum);
 
@@ -121,9 +130,11 @@ internal class Program
                 if (verbose)
                     output("[INFO] Waiting for 1-Wire adapter...");
 
-                SleepInterruptibly(1500, shouldStop);
+                SleepInterruptibly(1500, shouldContinue);
                 continue;
             }
+
+            AppLogger.Info($"Adapter opened. description='{adapter.AdapterDescription}', portType={portType}, portNum={adapter.PortNum}, adapterRom={adapter.AdapterRom ?? ""}");
 
             if (verbose)
             {
@@ -132,23 +143,28 @@ internal class Program
                 output(string.Empty);
             }
 
-            bool baselineEstablished = false;
-            bool lastWasPresent = false;
+            var ignoredRoms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(adapter.AdapterRom))
+                ignoredRoms.Add(adapter.AdapterRom);
+
+            if (verbose)
+            {
+                output($"[OK] Ignored reader devices: {ignoredRoms.Count}");
+                foreach (var romHex in ignoredRoms)
+                    output($"  Reader ROM   : {romHex}");
+                output(string.Empty);
+            }
+
+            var activeRoms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int pollCount = 0;
 
-            while (!shouldStop())
+            while (shouldContinue())
             {
                 try
                 {
                     pollCount++;
                     var result = adapter.Reset();
                     bool presentNow = result == TMEXResetResult.Presence || result == TMEXResetResult.Alarm;
-
-                    if (!baselineEstablished)
-                    {
-                        lastWasPresent = presentNow;
-                        baselineEstablished = true;
-                    }
 
                     if (verbose)
                     {
@@ -163,32 +179,58 @@ internal class Program
                         output($"[Poll #{pollCount}] Reset: {resetStr}");
                     }
 
-                    if (presentNow && !lastWasPresent)
+                    if (presentNow)
                     {
-                        byte[] rom = new byte[8];
-                        if (adapter.SearchNext(rom, 0, false))
+                        var currentRoms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var rom in adapter.SearchAll())
                         {
                             string romHex = FormatROM(rom);
+                            if (!CheckCRC8(rom))
+                                continue;
+
+                            if (!ignoredRoms.Contains(romHex))
+                                currentRoms.Add(romHex);
+                        }
+
+                        foreach (var romHex in currentRoms)
+                        {
+                            if (activeRoms.Contains(romHex))
+                                continue;
 
                             output(">>> iButton DETECTED <<<");
+                            output($"  Full ROM    : {romHex}");
 
-                            if (verbose)
+                            bool forwarded = false;
+                            if (sendKeyboard)
                             {
-                                string familyCode = $"0x{rom[0]:X2}";
-                                output($"  Family Code : {familyCode}");
-                                output($"  Serial No   : {romHex.Substring(2)}");
-                                output($"  Full ROM    : {romHex}");
-                                output($"  CRC         : 0x{rom[7]:X2} (valid: {CheckCRC8(rom)})");
+                                output("  Sending as keyboard input...");
+                                forwarded = KeyboardSimulator.SendROM(romHex);
+                                output(forwarded ? "  DONE" : "  SEND FAILED");
+                            }
+                            else
+                            {
+                                output("  Keyboard forwarding disabled (-nosend).");
                             }
 
-                            output("  Sending as keyboard input...");
-                            KeyboardSimulator.SendROM(romHex);
-                            output("  DONE");
+                            AppLogger.IButtonTouched(romHex, "console", forwarded);
+                            AppLogger.Info($"iButton touch detected. rom={romHex}, source=console, forwarded={forwarded}");
                         }
+
+                        foreach (var romHex in activeRoms)
+                            if (!currentRoms.Contains(romHex))
+                                AppLogger.Info($"iButton removed. rom={romHex}, source=console");
+
+                        activeRoms = currentRoms;
+                    }
+                    else
+                    {
+                        foreach (var romHex in activeRoms)
+                            AppLogger.Info($"iButton removed. rom={romHex}, source=console");
+
+                        activeRoms.Clear();
                     }
 
-                    lastWasPresent = presentNow;
-                    SleepInterruptibly(100, shouldStop);
+                    SleepInterruptibly(100, shouldContinue);
                 }
                 catch (Exception ex)
                 {
@@ -199,10 +241,10 @@ internal class Program
         }
     }
 
-    private static void SleepInterruptibly(int milliseconds, Func<bool> shouldStop)
+    private static void SleepInterruptibly(int milliseconds, Func<bool> shouldContinue)
     {
         int elapsed = 0;
-        while (elapsed < milliseconds && !shouldStop())
+        while (elapsed < milliseconds && shouldContinue())
         {
             int slice = Math.Min(100, milliseconds - elapsed);
             Thread.Sleep(slice);
@@ -269,11 +311,12 @@ internal class Program
         Console.WriteLine("Usage: 1wireHID [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  -usb [n]     Use USB adapter (DS9490R), port number n (default: 0)");
+        Console.WriteLine("  -usb [n]     Use USB adapter (DS9490R), port number n (default: 2)");
         Console.WriteLine("  -com n       Use COM port adapter (DS9097U), port number n");
         Console.WriteLine("  -v, -verbose Verbose output showing raw driver data");
         Console.WriteLine("  -tray        Run tray mode (default)");
         Console.WriteLine("  -console     Run console diagnostic mode");
+        Console.WriteLine("  -nosend      Detect/log iButtons without sending keyboard input");
         Console.WriteLine("  -rom <hex>   Send a specific ROM and exit (for testing)");
         Console.WriteLine("  -h, -help    Show this help");
         Console.WriteLine();
